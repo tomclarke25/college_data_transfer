@@ -1,6 +1,7 @@
-./build
-./data
-./.idea
+build/
+data/
+.idea/
+.DS_Store
 # Default ignored files
 /shelf/
 /workspace.xml
