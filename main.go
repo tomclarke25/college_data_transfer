@@ -1,183 +1,208 @@
 package main
 
 import (
+	"bytes"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strconv"
 )
 
-type Teacher struct {
-	FirstName string
-	Surname   string
-	Email     string
-	StaffID   int
-}
+type (
+	Student struct {
+		RegisterNumberShort string `json:"register_number_short"`
+		RefNum              int    `json:"ref_num"`
+		LastName            string `json:"last_name"`
+		FirstName           string `json:"first_name"`
+		Email               string `json:"email"`
+		StaffID             int    `json:"staff_id"`
+	}
 
-type Class struct {
-	OfferingCode string
-	Title        string
-	StaffID      int
-	Staff        string
-}
+	Class struct {
+		RegisterNumberShort string `json:"register_number_short"`
+		RegisterTitle       string `json:"register_title"`
+		StaffID             int    `json:"staff_id"`
+	}
 
-type Student struct {
-	Forename string
-	Surname  string
-	Email    string
-	Email2   string
-	//OfferingCode string
-	RefNo int
-}
+	Teacher struct {
+		FirstName string `json:"first_name"`
+		LastName  string `json:"last_name"`
+		Email     string `json:"email"`
+		StaffID   int    `json:"staff_id"`
+	}
+)
 
-type StudentOffering struct {
-	StudentRefNo int
-	OfferingCode string
-}
+const (
+	teacherCSVFields = 4
+	studentCSVFields = 7
+	classCSVFields   = 5
+)
 
 func main() {
+	err := convertTeachersData()
+	if err != nil {
+		log.Fatalf("failed to process teachers: %v", err)
+	}
 
-	//teachers := readTeachers("data/Teachers.csv")
-	////teacherIDMap := make(map[string]int)
-	//for _, teacher := range teachers {
-	//	fmt.Println(teacher)
-	//}
+	err = convertStudentsData()
+	if err != nil {
+		log.Fatalf("failed to process students: %v", err)
+	}
 
-	//classes := readClasses("data/Classes.csv")
-	////classIDMap := make(map[string]int)
-	//for _, class := range classes {
-	//	fmt.Println(class)
-	//}
-
-	//students, _ := readStudents("data/Students.csv")
-	//fmt.Println("Students")
-	//for _, student := range students {
-	//	fmt.Println(student)
-	//}
-
-	//fmt.Println("Offerings")
-	//for _, studentOffering := range studentOfferings {
-	//	fmt.Println(studentOffering)
-	//}
-
-	fmt.Println("Data imported successfully")
+	err = convertClassesData()
+	if err != nil {
+		log.Fatalf("failed to process classes: %v", err)
+	}
 }
 
-func readTeachers(filename string) []Teacher {
-	file, err := os.Open(filename)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer func(file *os.File) {
-		err := file.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}(file)
-
-	reader := csv.NewReader(file)
-	records, err := reader.ReadAll()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	var teachers []Teacher
-	for _, record := range records[1:] { // Skip header
-		staffID, err := strconv.Atoi(record[3])
-		if err != nil {
-			log.Fatalf("Error converting StaffID to int: %v", err)
-		}
-		teachers = append(teachers, Teacher{
-			FirstName: record[0],
-			Surname:   record[1],
-			Email:     record[2],
-			StaffID:   staffID,
-		})
-	}
-
-	return teachers
+func convertTeachersData() error {
+	return convertCSVToJSON("data/Teachers.csv", "teachers.json", teacherCSVFields, createTeacher)
 }
 
-func readClasses(filename string) []Class {
-	file, err := os.Open(filename)
+func createTeacher(record []string) (Teacher, error) {
+	staffID, err := parseID(record[3])
 	if err != nil {
-		log.Fatal(err)
+		return Teacher{}, fmt.Errorf("failed to parse staff id: %w", err)
 	}
-	defer func(file *os.File) {
-		err := file.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}(file)
-
-	reader := csv.NewReader(file)
-	records, err := reader.ReadAll()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	var classes []Class
-	for _, record := range records[1:] { // Skip header
-		staffID, err := strconv.Atoi(record[2])
-		if err != nil {
-			log.Fatalf("Error converting StaffID to int: %v", err)
-		}
-		classes = append(classes, Class{
-			OfferingCode: record[0],
-			Title:        record[1],
-			StaffID:      staffID,
-			Staff:        record[3],
-		})
-	}
-
-	return classes
+	return Teacher{
+		FirstName: record[0],
+		LastName:  record[1],
+		Email:     record[2],
+		StaffID:   staffID,
+	}, nil
 }
 
-func readStudents(filename string) ([]Student, []StudentOffering) {
-	file, err := os.Open(filename)
+func convertStudentsData() error {
+	return convertCSVToJSON("data/Students.csv", "students.json", studentCSVFields, createStudent)
+}
+
+func createStudent(record []string) (Student, error) {
+	refNum, err := parseID(record[1])
 	if err != nil {
-		log.Fatal(err)
+		return Student{}, fmt.Errorf("failed to parse ref number: %w", err)
 	}
-	defer func(file *os.File) {
-		err := file.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}(file)
-
-	reader := csv.NewReader(file)
-	records, err := reader.ReadAll()
+	staffID, err := parseID(record[6])
 	if err != nil {
-		log.Fatal(err)
+		return Student{}, fmt.Errorf("failed to parse staff id: %w", err)
+	}
+	return Student{
+		RegisterNumberShort: record[0],
+		RefNum:              refNum,
+		LastName:            record[2],
+		FirstName:           record[3],
+		Email:               record[4],
+		StaffID:             staffID,
+	}, nil
+}
+
+func convertClassesData() error {
+	return convertCSVToJSON("data/Classes.csv", "classes.json", classCSVFields, createClass)
+}
+
+func createClass(record []string) (Class, error) {
+	staffID, err := parseID(record[2])
+	if err != nil {
+		return Class{}, fmt.Errorf("failed to parse staff id: %w", err)
+	}
+	return Class{
+		RegisterNumberShort: record[0],
+		RegisterTitle:       record[1],
+		StaffID:             staffID,
+	}, nil
+}
+
+func parseID(id string) (int, error) {
+	convertedID, err := strconv.Atoi(id)
+	if err != nil {
+		return 0, fmt.Errorf("failed converting to Int: %w", err)
 	}
 
-	var students []Student
-	var studentOfferings []StudentOffering
-	studentMap := make(map[int]Student)
-	for _, record := range records[1:] {
-		refNo, err := strconv.Atoi(record[5])
+	return convertedID, nil
+}
+
+func writeJSON[T any](data []T, filename string) error {
+	jsonData, err := json.MarshalIndent(data, "", "	")
+	if err != nil {
+		return fmt.Errorf("failed creating json: %w", err)
+	}
+
+	if err := os.WriteFile(filename, jsonData, 0644); err != nil {
+		return fmt.Errorf("failed writing to file: %w", err)
+	}
+
+	return nil
+}
+
+func readCSVFile(filename string) ([]byte, error) {
+	f, err := os.Open(filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+	defer func(f *os.File) {
+		err := f.Close()
 		if err != nil {
-			log.Fatalf("Error converting StaffID to int: %v", err)
+			log.Printf("failed to close file: %v", err)
 		}
-		if _, exists := studentMap[refNo]; !exists {
-			studentMap[refNo] = Student{
-				Forename: record[0],
-				Surname:  record[1],
-				Email:    record[2],
-				Email2:   record[3],
-				RefNo:    refNo,
-			}
-		}
-		studentOfferings = append(studentOfferings, StudentOffering{
-			StudentRefNo: refNo,
-			OfferingCode: record[4],
-		})
+	}(f)
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read data: %w", err)
 	}
 
-	for _, student := range studentMap {
-		students = append(students, student)
+	return data, nil
+}
+
+func parseCSVRecords[T any](data []byte, createFunc func([]string) (T, error)) ([]T, error) {
+	reader := csv.NewReader(bytes.NewReader(data))
+
+	if _, err := reader.Read(); err != nil {
+		return nil, fmt.Errorf("failed to read header: %w", err)
 	}
 
-	return students, studentOfferings
+	estimatedRecords := bytes.Count(data, []byte{'\n'})
+	records := make([]T, 0, estimatedRecords)
+
+	for {
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, fmt.Errorf("failed to read file: %w", err)
+		}
+		item, err := createFunc(record)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create record: %w", err)
+		}
+		records = append(records, item)
+	}
+	return records, nil
+}
+
+func convertCSVToJSON[T any](inputFile, outputFile string, expectedFields int, createFunc func([]string) (T, error)) error {
+	log.Printf("Processing file: %s", inputFile)
+	data, err := readCSVFile(inputFile)
+	if err != nil {
+		return fmt.Errorf("failed to read input file: %w", err)
+	}
+
+	records, err := parseCSVRecords(data, func(record []string) (T, error) {
+		if len(record) != expectedFields {
+			return *new(T), fmt.Errorf("expected %d fields, got %d", expectedFields, len(record))
+		}
+
+		return createFunc(record)
+	})
+	if err != nil {
+		return fmt.Errorf("failed to process CSV: %w", err)
+	}
+
+	err = writeJSON(records, outputFile)
+	if err != nil {
+		return fmt.Errorf("failed to create and write JSON: %w", err)
+	}
+	log.Printf("Successfully processed file: %s", inputFile)
+	return nil
 }
