@@ -93,7 +93,7 @@ func createStudent(record []string) (Student, error) {
 		RefNum:              refNum,
 		LastName:            record[2],
 		FirstName:           record[3],
-		Email:               record[4],
+		Email:               record[5],
 		StaffID:             staffID,
 	}, nil
 }
