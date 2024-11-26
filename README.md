@@ -3,18 +3,17 @@
 ## Prerequisites
 
 - Go 1.16 or later
-- Git
 
 ## Setup
 
 1. Clone the repository:
 
     ```sh
-    git clone https://github.com/yourusername/collegeDataTransfer.git
+    git clone https://github.com/tomclarke25/collegeDataTransfer.git
     cd collegeDataTransfer
     ```
 
-2. Install dependencies (if any):
+2. Install dependencies:
 
     ```sh
     go mod tidy
